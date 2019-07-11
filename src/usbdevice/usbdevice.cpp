@@ -36,6 +36,10 @@ const DeviceType webusbDeviceTypes[] = {
     DeviceType(0x1209, 0x53c1, "Trezor", "One", USBDEVICE_TREZOR_ONE),
 };
 
+const DeviceType emulatorDeviceTypes[] = {
+    DeviceType(0x1209, 0x53c1, "Trezor", "One", USBDEVICE_TREZOR_ONE),
+};
+
 void ShutdownHardwareIntegration()
 {
     // Safe to call ShutdownProtobufLibrary multiple times
@@ -155,6 +159,21 @@ void ListWebUSBDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
     return;
 };
 
+void ListEmulatorDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
+{
+    sockaddr_in emulator_destination;
+    emulator_destination.sin_family = AF_INET;
+    emulator_destination.sin_port = htons(21324);
+    if (inet_aton("127.0.0.1", &emulator_destination.sin_addr)==0) {
+        return;
+    }
+
+    std::unique_ptr<CUSBDevice> device(new CTrezorDevice(emulator_destination));
+    vDevices.push_back(std::move(device));
+        
+    return;
+};
+
 void ListAllDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
 {
     if (Params().NetworkIDString() == "regtest") {
@@ -164,6 +183,8 @@ void ListAllDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
 
     ListHIDDevices(vDevices);
     ListWebUSBDevices(vDevices);
+    // TODO: how to handle multiple devices (debugdevice + emulator device)?
+    ListEmulatorDevices(vDevices);
 
     return;
 };

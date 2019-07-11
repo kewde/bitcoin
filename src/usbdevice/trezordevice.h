@@ -39,6 +39,10 @@ private:
 public:
     CTrezorDevice(const DeviceType *pType_, const char *cPath_, const char *cSerialNo_, int nInterface_)
         : CUSBDevice(pType_, cPath_, cSerialNo_, nInterface_) {};
+    CTrezorDevice(sockaddr_in emulator_destination_) {
+        emulator = true;
+        emulator_destination = emulator_destination_;
+    };
 
     int Open() override;
     int Close() override;
@@ -74,6 +78,11 @@ private:
     int ReadV1(uint16_t& msg_type, std::vector<uint8_t>& vec);
 protected:
     webusb_device *handle = nullptr;
+
+    // Emulator
+    bool emulator = false;
+    struct sockaddr_in emulator_destination;
+    int emulator_handle;
 };
 
 } // usb_device

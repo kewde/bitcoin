@@ -181,10 +181,15 @@ static UniValue listdevices(const JSONRPCRequest &request)
     for (size_t i = 0; i < vDevices.size(); ++i) {
         usb_device::CUSBDevice *device = vDevices[i].get();
         UniValue obj(UniValue::VOBJ);
-        obj.pushKV("vendor", device->pType->cVendor);
-        obj.pushKV("product", device->pType->cProduct);
-        obj.pushKV("serialno", device->cSerialNo);
+        if (device->pType != nullptr) {
+            obj.pushKV("vendor", device->pType->cVendor);
+            obj.pushKV("product", device->pType->cProduct);
+            obj.pushKV("serialno", device->cSerialNo);
+        } else {
+             obj.pushKV("emulator", true);
+        }
 
+    
         std::string sValue, sError;
         if (0 == device->GetFirmwareVersion(sValue, sError)) {
             obj.pushKV("firmwareversion", sValue);
