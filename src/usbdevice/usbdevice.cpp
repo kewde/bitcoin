@@ -189,7 +189,7 @@ void ListAllDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
     ListHIDDevices(vDevices);
     ListWebUSBDevices(vDevices);
     // TODO: how to handle multiple devices (debugdevice + emulator device)?
-    ListEmulatorDevices(vDevices);
+    //ListEmulatorDevices(vDevices);
 
     return;
 };

@@ -35,6 +35,14 @@ private:
     };
 
     std::string GetCoinName();
+
+    // Handle to the device
+    webusb_device *handle = nullptr;
+    // Emulator
+    int emulator_handle;
+    bool emulator = false;
+    struct sockaddr_in emulator_destination;
+
 public:
     CTrezorDevice(const DeviceType *pType_, const char *cPath_, const char *cSerialNo_, int nInterface_)
         : CUSBDevice(pType_, cPath_, cSerialNo_, nInterface_) {};
@@ -42,6 +50,9 @@ public:
         emulator = true;
         emulator_destination = emulator_destination_;
     };
+
+    int WriteV1(uint16_t msg_type, std::vector<uint8_t>& vec);
+    int ReadV1(uint16_t& msg_type, std::vector<uint8_t>& vec);
 
     int Open() override;
     int Close() override;
@@ -72,16 +83,6 @@ public:
 
     bool m_preparing = false;
     std::map<int, SignData> m_cache;
-
-    bool emulator = false;
-    struct sockaddr_in emulator_destination;
-
-protected:
-    webusb_device *handle = nullptr;
-
-    // Emulator
-
-    int emulator_handle;
 };
 
 } // usb_device
