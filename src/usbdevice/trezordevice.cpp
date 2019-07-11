@@ -26,31 +26,49 @@ namespace usb_device {
 
 int CTrezorDevice::Open()
 {
-    if (!pType) {
-        return 1;
+    if (emulator) {
+        // Use Emulator for tests
+        if ((emulator_handle=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1) {
+            return 1;
+        }
+
+
+        return 0;
+    } else {
+        // WebUSB
+        if (!pType) {
+            return 1;
+        }
+
+        if (webusb_init()) {
+            return 1;
+        }
+
+        if (!(handle = webusb_open_path(cPath))) {
+            webusb_exit();
+            return 1;
+        }
+
+        return 0;
     }
 
-    if (webusb_init()) {
-        return 1;
-    }
-
-    if (!(handle = webusb_open_path(cPath))) {
-        webusb_exit();
-        return 1;
-    }
-
-    return 0;
 };
 
 int CTrezorDevice::Close()
 {
-    if (handle) {
-        webusb_close(handle);
-    }
-    handle = nullptr;
+    if (emulator) {
+        close(emulator_handle);
+        return 0;
+    } else {
+        if (handle) {
+            webusb_close(handle);
+        }
+        handle = nullptr;
 
-    webusb_exit();
-    return 0;
+        webusb_exit();
+        return 0;
+    }
+
 };
 
 static int WriteV1(webusb_device* handle, uint16_t msg_type, std::vector<uint8_t>& vec)

@@ -150,6 +150,7 @@ public:
 
 void ListHIDDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);
 void ListWebUSBDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);
+void ListEmulatorDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);
 void ListAllDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);
 CUSBDevice *SelectDevice(std::vector<std::unique_ptr<CUSBDevice> > &vDevices, std::string &sError);
 
