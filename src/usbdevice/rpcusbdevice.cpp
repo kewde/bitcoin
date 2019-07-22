@@ -866,8 +866,10 @@ static UniValue initaccountfromdevice(const JSONRPCRequest &request)
         sea->nFlags |= EAF_ACTIVE | EAF_HARDWARE_DEVICE;
         sea->mapValue[EKVT_CREATED_AT] = SetCompressedInt64(vData, GetTime());
         vData.clear();
-        PushUInt32(vData, pDevice->pType->nVendorId);
-        PushUInt32(vData, pDevice->pType->nProductId);
+        if (pDevice->pType != nullptr) {
+            PushUInt32(vData, pDevice->pType->nVendorId);
+            PushUInt32(vData, pDevice->pType->nProductId);
+        }
         sea->mapValue[EKVT_HARDWARE_DEVICE] = vData;
         sea->InsertChain(sekAccount);
 

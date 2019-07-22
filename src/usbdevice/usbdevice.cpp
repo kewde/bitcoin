@@ -172,9 +172,7 @@ void ListEmulatorDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
     }
 
     std::unique_ptr<CUSBDevice> device(new CTrezorDevice(emulator_destination));
-    LogPrintf("after CTrezorDevice");
     vDevices.push_back(std::move(device));
-    LogPrintf("after vDevices pushback");
         
     return;
 };
@@ -189,7 +187,7 @@ void ListAllDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
     ListHIDDevices(vDevices);
     ListWebUSBDevices(vDevices);
     // TODO: how to handle multiple devices (debugdevice + emulator device)?
-    //ListEmulatorDevices(vDevices);
+    ListEmulatorDevices(vDevices);
 
     return;
 };

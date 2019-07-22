@@ -32,7 +32,6 @@ int CTrezorDevice::Open()
             return 1;
         }
 
-
         return 0;
     } else {
         // WebUSB
@@ -103,7 +102,13 @@ int CTrezorDevice::WriteV1(uint16_t msg_type, std::vector<uint8_t>& vec)
         if (i + put < BUFFER_LEN) {
             memset(buffer + i + put, 0, BUFFER_LEN - (i + put));
         }
-        int result = webusb_write(handle, buffer, BUFFER_LEN);
+        int result;
+        if (emulator) {
+            //result = write(emulator_handle, buffer, BUFFER_LEN);
+            result = sendto(emulator_handle, buffer, BUFFER_LEN , 0 , (struct sockaddr *) &emulator_destination, sizeof(emulator_destination));
+        } else {
+            result = webusb_write(handle, buffer, BUFFER_LEN);
+        }
         if (result < 0) {
             return result;
         }
@@ -113,16 +118,35 @@ int CTrezorDevice::WriteV1(uint16_t msg_type, std::vector<uint8_t>& vec)
     return 0;
 };
 
-static int ReadWithTimeoutV1(webusb_device* handle, uint16_t& msg_type, std::vector<uint8_t>& vec, int timeout)
+int CTrezorDevice::ReadV1(uint16_t& msg_type, std::vector<uint8_t>& vec)
 {
+    int timeout = 60000;
     static const size_t BUFFER_LEN = 64;
     uint8_t buffer[BUFFER_LEN];
 
-    size_t result = webusb_read_timeout(handle, buffer, BUFFER_LEN, timeout);
+    size_t result;
+    if (emulator){
+        // TODO: figure out why the fuck this setsockopt is failing my ass
+        /*struct timeval tv;
+        tv.tv_sec = 0;
+        tv.tv_usec = timeout * 1000;
+
+        if (setsockopt(emulator_handle, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+            LogPrintf("setsockopt failed!\n");
+            return -1;
+        }*/
+
+        socklen_t emulator_destination_length = sizeof(emulator_destination);
+        result = recvfrom(emulator_handle, buffer, BUFFER_LEN, 0, (struct sockaddr *) &emulator_destination, &emulator_destination_length);
+    } else {
+        result = webusb_read_timeout(handle, buffer, BUFFER_LEN, timeout);
+    }
     if (result < 9) {
+        LogPrintf("Result code %i < 9, error? \n", result);
         return result;
     }
     if (buffer[0] != '?' || buffer[1] != '#' || buffer[2] != '#') {
+        LogPrintf("Buffer magic bytes mismatch \n");
         return -1;
     }
 
@@ -138,27 +162,32 @@ static int ReadWithTimeoutV1(webusb_device* handle, uint16_t& msg_type, std::vec
 
     size_t get = std::min(len_full, BUFFER_LEN - 9);
     memcpy(vec.data(), buffer + 9, get);
-    size_t read = get;
+    size_t bytes_read = get;
 
-    while (read < len_full) {
-        int result = webusb_read_timeout(handle, buffer, BUFFER_LEN, timeout);
+    while (bytes_read < len_full) {
+        int result;
+        if (emulator){
+            socklen_t emulator_destination_length = sizeof(emulator_destination);
+            result = recvfrom(emulator_handle, buffer, BUFFER_LEN, 0, (struct sockaddr *) &emulator_destination, &emulator_destination_length);
+        } else {
+            result = webusb_read_timeout(handle, buffer, BUFFER_LEN, timeout);
+        }
         if (result < 1) {
+            // recvfrom() returned -1
+            LogPrintf("Result code (2) %i < 1, error = %s? \n", result, std::strerror(errno));
             return result;
         }
         if (buffer[0] != '?') {
+            LogPrintf("Second buffer magic bytes mismatch \n");
             return -1;
         }
-        size_t get = std::min(len_full - read, BUFFER_LEN - 1);
-        memcpy(vec.data() + read, buffer + 1, get);
-        read += get;
+        size_t get = std::min(len_full - bytes_read, BUFFER_LEN - 1);
+        memcpy(vec.data() + bytes_read, buffer + 1, get);
+        bytes_read += get;
     }
 
+    LogPrintf("Returning 0 - should be ok \n");
     return 0;
-};
-
-int CTrezorDevice::ReadV1(uint16_t& msg_type, std::vector<uint8_t>& vec)
-{
-    return ReadWithTimeoutV1(handle, msg_type, vec, 60000);
 };
 
 int CTrezorDevice::OpenIfUnlocked(std::string& sError)
@@ -251,12 +280,15 @@ int CTrezorDevice::GetFirmwareVersion(std::string& sFirmware, std::string& sErro
         return errorN(1, sError, __func__, "WriteV1 failed.");
     }
 
+    LogPrintf("GetFirmwareVersion: WriteV1 done!\n");
+
     uint16_t msg_type_out = 0;
+    LogPrintf("GetFirmwareVersion: doing ReadV1!\n");
     if (0 != CTrezorDevice::ReadV1(msg_type_out, vec_out)) {
         Close();
         return errorN(1, sError, __func__, "ReadV1 failed.");
     }
-
+    LogPrintf("GetFirmwareVersion: ReadV1 done!\n");
     Close();
 
     if (!msg_out.ParseFromArray(vec_out.data(), vec_out.size())) {
