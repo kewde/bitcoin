@@ -27,7 +27,7 @@ namespace usb_device {
 int CTrezorDevice::Open()
 {
     if (emulator) {
-        // Use Emulator for tests
+        // Emulator
         if ((emulator_handle=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1) {
             return 1;
         }
@@ -125,7 +125,7 @@ int CTrezorDevice::ReadV1(uint16_t& msg_type, std::vector<uint8_t>& vec)
 
     size_t result;
     if (emulator){
-        // TODO: figure out why the fuck this setsockopt is failing my ass
+        // TODO: figure out why this setsockopt is failing
         /*struct timeval tv;
         tv.tv_sec = 0;
         tv.tv_usec = timeout * 1000;
@@ -273,14 +273,11 @@ int CTrezorDevice::GetFirmwareVersion(std::string& sFirmware, std::string& sErro
         return errorN(1, sError, __func__, "WriteV1 failed.");
     }
 
-    LogPrintf("GetFirmwareVersion: WriteV1 done!\n");
-
     uint16_t msg_type_out = 0;
     if (0 != ReadV1(msg_type_out, vec_out)) {
         Close();
         return errorN(1, sError, __func__, "ReadV1 failed.");
     }
-    LogPrintf("GetFirmwareVersion: ReadV1 done!\n");
     Close();
 
     if (!msg_out.ParseFromArray(vec_out.data(), vec_out.size())) {
