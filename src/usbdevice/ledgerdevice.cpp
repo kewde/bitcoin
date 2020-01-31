@@ -85,32 +85,108 @@ static const char *GetLedgerString(int code)
 
 int CLedgerDevice::Open()
 {
-    if (!pType) {
-        return 1;
-    }
+    if(emulator){
+        // Open up a TCP connection to the emulator address
+        if ((emulator_handle=socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            LogPrintf("%s: socket() errored: %ld\n", __func__, errno);
+            return 1;
+        }
 
-    if (hid_init()) {
-        return 1;
-    }
+        LogPrintf("%s: calling connect() %ld\n", __func__, errno);
+        if (connect(emulator_handle, (struct sockaddr *)&emulator_destination, sizeof(emulator_destination)) < 0) { 
+            LogPrintf("%s: connect() errored: %ld\n", __func__, errno);
+            return 1; 
+        } 
+        LogPrintf("%s: finished connect(): %ld\n", __func__, errno);
 
-    if (!(handle = hid_open_path(cPath))) {
-        hid_exit();
-        return 1;
-    }
+        return 0;
+    } else {
+        if (!pType) {
+            return 1;
+        }
 
-    return 0;
+        if (hid_init()) {
+            return 1;
+        }
+
+        if (!(handle = hid_open_path(cPath))) {
+            hid_exit();
+            return 1;
+        }
+
+        return 0;
+    }
+    
 };
 
 int CLedgerDevice::Close()
 {
-    if (handle) {
-        hid_close(handle);
-    }
-    handle = nullptr;
+    if(emulator) {
+        close(emulator_handle);
+        return 0;
+    } else {
+        if (handle) {
+            hid_close(handle);
+        }
+        handle = nullptr;
 
-    hid_exit();
-    return 0;
+        hid_exit();
+        return 0;
+    }
 };
+
+// Returns length
+int CLedgerDevice::Write(const unsigned char *apdu, size_t apduLength, unsigned char *out, size_t outLength, int *sw) {
+    if(emulator) {
+        LogPrintf("%s: calling apdu length send() \n", __func__);
+        int apduLengthInt = htonl((int) apduLength);
+        int result = send(emulator_handle, &apduLengthInt, sizeof(apduLengthInt) , 0);
+        if(result < 0) {
+            // Failed write, won't read then
+            LogPrintf("%s: apdu length send() result errored: %ld\n", __func__, errno);
+            return 0;
+        }
+
+        LogPrintf("%s: calling apdu send() \n", __func__);
+        result = send(emulator_handle, apdu, apduLength , 0);
+        if(result < 0) {
+            // Failed write, won't read then
+            LogPrintf("%s: apdu send() result errored: %ld\n", __func__, errno);
+            return 0;
+        }
+
+        // The first 4 bytes sent back are the length of the APDU that follows.
+        int response_length = 0;
+        // ledger will always return 4 bytes, sizeof(int) always 4 on all arch? 
+        result = recv(emulator_handle, &response_length, 4, 0);
+        response_length = ntohl(response_length);
+        LogPrintf("%s: response_length: %ld\n", __func__, response_length);
+
+        // Make sure that we can fit the data in the out buffer without overflow
+        if (outLength < response_length + 1) {
+            LogPrintf("%s: can't fit the returned apdu into the buffer : %ld < %ld\n", __func__, outLength, response_length+1);
+            return 0;
+        }
+
+        // Fetch the APDU bytes
+        unsigned char buffer[response_length + 1];
+        result = recv(emulator_handle, buffer, response_length, 0);
+        buffer[response_length] = '\0';
+        memcpy(out, buffer, response_length + 1);
+
+        // The last 2 bytes are the SW code
+        unsigned char sw_short[2];
+        result = recv(emulator_handle, sw_short, 2, 0);
+        *sw = (sw_short[0]<<8)+sw_short[1]; // Fix endianness & turn into int
+
+        return response_length;
+
+    } else {
+        // const unsigned char ledger,  always 1??
+        return sendApduHidHidapi(handle, 1, apdu, apduLength, out, sizeof(out), sw);
+    }
+
+}
 
 int CLedgerDevice::GetFirmwareVersion(std::string &sFirmware, std::string &sError)
 {
@@ -128,7 +204,7 @@ int CLedgerDevice::GetFirmwareVersion(std::string &sFirmware, std::string &sErro
     in[apduSize++] = 0x00;
 
     int sw;
-    int result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    int result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
     Close();
 
     if (sw != SW_OK) {
@@ -159,7 +235,7 @@ int CLedgerDevice::GetInfo(UniValue &info, std::string &sError)
     in[apduSize++] = 0x00;
 
     int sw;
-    int result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    int result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
 
     if (sw != SW_OK) {
         Close();
@@ -196,7 +272,7 @@ int CLedgerDevice::GetInfo(UniValue &info, std::string &sError)
     in[apduSize++] = 0x00;
     in[apduSize++] = 0x00;
 
-    result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
     if (sw == SW_OK) {
         int om = out[0];
         info.pushKV("operation_mode", strprintf("%.2x %s", om,
@@ -244,7 +320,7 @@ int CLedgerDevice::GetPubKey(const std::vector<uint32_t> &vPath, CPubKey &pk, st
     }
 
     int sw;
-    int result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    int result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
     Close();
 
     if (sw != SW_OK) {
@@ -293,7 +369,7 @@ int CLedgerDevice::GetXPub(const std::vector<uint32_t> &vPath, CExtPubKey &ekp, 
     }
 
     int sw;
-    int result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    int result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
 
     // Get fingerprint
     if (sw == SW_OK && lenPath > 1 && result > 65) {
@@ -302,7 +378,7 @@ int CLedgerDevice::GetXPub(const std::vector<uint32_t> &vPath, CExtPubKey &ekp, 
         in[5] = lenPathParent;
         apduSize-=4;
 
-        result = sendApduHidHidapi(handle, 1, in, apduSize, outB, sizeof(outB), &sw);
+        result = CLedgerDevice::Write(in, apduSize, outB, sizeof(outB), &sw);
     }
     Close();
 
@@ -384,7 +460,7 @@ int CLedgerDevice::SignMessage(const std::vector<uint32_t> &vPath, const std::st
     in[OFFSET_CDATA] = (apduSize - 5);
 
     int sw;
-    int result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    int result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
 
     if (sw != SW_OK) {
         Close();
@@ -408,7 +484,7 @@ int CLedgerDevice::SignMessage(const std::vector<uint32_t> &vPath, const std::st
     in[apduSize++] = 0x00;
     in[apduSize++] = 0x00;
     in[OFFSET_CDATA] = (apduSize - 5);
-    result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
 
     Close();
 
@@ -467,7 +543,7 @@ int CLedgerDevice::PrepareTransaction(CMutableTransaction &tx, const CCoinsViewC
     in[apduSize++] = 0x00;
     apduSize += PutVarInt(&in[apduSize], tx.vin.size());
 
-    result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
     if (sw != SW_OK) {
         return errorN(1, sError, __func__, "Dongle error: %.4x %s", sw, GetLedgerString(sw));
     }
@@ -513,7 +589,7 @@ int CLedgerDevice::PrepareTransaction(CMutableTransaction &tx, const CCoinsViewC
 
         in[ofslen] = apduSize - (ofslen+1);
 
-        result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+        result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
         if (sw != SW_OK) {
             return errorN(1, sError, __func__, "Dongle error: %.4x %s", sw, GetLedgerString(sw));
         }
@@ -541,7 +617,7 @@ int CLedgerDevice::PrepareTransaction(CMutableTransaction &tx, const CCoinsViewC
 
             in[ofslen] = apduSize - (ofslen+1);
 
-            result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+            result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
             if (sw != SW_OK) {
                 return errorN(1, sError, __func__, "Dongle error: %.4x %s", sw, GetLedgerString(sw));
             }
@@ -601,7 +677,7 @@ int CLedgerDevice::PrepareTransaction(CMutableTransaction &tx, const CCoinsViewC
         memcpy(&in[apduSize], &vOutputData[offset], dataLength);
         apduSize += dataLength;
 
-        result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+        result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
         if (sw != SW_OK || result < 0) {
             return errorN(1, sError, __func__, "Dongle error: %.4x %s", sw, GetLedgerString(sw));
         }
@@ -616,7 +692,7 @@ int CLedgerDevice::SignTransaction(const std::vector<uint32_t> &vPath, const std
     int nIn, const CScript &scriptCode, int hashType, const std::vector<uint8_t>& amount, SigVersion sigversion,
     std::vector<uint8_t> &vchSig, std::string &sError)
 {
-    if (!handle) {
+    if (0 != Open()) {
         return errorN(1, sError, __func__, "Device not open.");
     }
     int result, sw;
@@ -640,7 +716,7 @@ int CLedgerDevice::SignTransaction(const std::vector<uint32_t> &vPath, const std
     in[apduSize++] = 0x00;
     apduSize += PutVarInt(&in[apduSize], 1);
 
-    result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
     if (sw != SW_OK) {
         return errorN(1, sError, __func__, "Dongle error: %.4x %s", sw, GetLedgerString(sw));
     }
@@ -668,7 +744,7 @@ int CLedgerDevice::SignTransaction(const std::vector<uint32_t> &vPath, const std
 
     in[ofslen] = apduSize - (ofslen+1);
 
-    result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
     if (sw != SW_OK) {
         return errorN(1, sError, __func__, "Dongle error: %.4x %s", sw, GetLedgerString(sw));
     }
@@ -695,7 +771,7 @@ int CLedgerDevice::SignTransaction(const std::vector<uint32_t> &vPath, const std
 
         in[ofslen] = apduSize - (ofslen+1);
 
-        result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+        result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
         if (sw != SW_OK) {
             return errorN(1, sError, __func__, "Dongle error: %.4x %s", sw, GetLedgerString(sw));
         }
@@ -727,7 +803,7 @@ int CLedgerDevice::SignTransaction(const std::vector<uint32_t> &vPath, const std
     }
 
     in[ofslen] = apduSize - (ofslen+1);
-    result = sendApduHidHidapi(handle, 1, in, apduSize, out, sizeof(out), &sw);
+    result = CLedgerDevice::Write(in, apduSize, out, sizeof(out), &sw);
     if (sw != SW_OK) {
         return errorN(1, sError, __func__, "Dongle error: %.4x %s", sw, GetLedgerString(sw));
     }

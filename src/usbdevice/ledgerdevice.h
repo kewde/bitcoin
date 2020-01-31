@@ -14,9 +14,21 @@ namespace usb_device {
 
 class CLedgerDevice : public CUSBDevice
 {
+private:
+    // Emulator
+    int emulator_handle;
+    bool emulator = false;
+    struct sockaddr_in emulator_destination;
+    
 public:
     CLedgerDevice(const DeviceType *pType_, const char *cPath_, const char *cSerialNo_, int nInterface_)
         : CUSBDevice(pType_, cPath_, cSerialNo_, nInterface_) {};
+    CLedgerDevice(sockaddr_in emulator_destination_) {
+        emulator = true;
+        emulator_destination = emulator_destination_;
+    };
+
+    int Write(const unsigned char *apdu, size_t apduLength, unsigned char *out, size_t outLength, int *sw);
 
     int Open() override;
     int Close() override;
