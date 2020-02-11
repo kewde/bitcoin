@@ -382,6 +382,8 @@ libparticl_usbdevice_a_SOURCES = \
   usbdevice/ledger/ledgerLayer.c \
   usbdevice/ledger/dongleCommHidHidapi.h \
   usbdevice/ledger/dongleCommHidHidapi.c \
+  usbdevice/ledger/dongleCommEmulator.h \
+  usbdevice/ledger/dongleCommEmulator.cpp \
   usbdevice/usbdevice.cpp \
   usbdevice/debugdevice.h \
   usbdevice/debugdevice.cpp \
