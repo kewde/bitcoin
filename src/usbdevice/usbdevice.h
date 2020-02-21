@@ -28,6 +28,8 @@ enum DeviceTypeID {
     USBDEVICE_TREZOR_ONE = 2,
     USBDEVICE_LEDGER_BLUE = 3,
     USBDEVICE_LEDGER_NANO_X = 4,
+    EMULATOR_LEDGER = 5,
+    EMULATOR_TREZOR = 6,
     USBDEVICE_SIZE,
 };
 
@@ -147,6 +149,7 @@ public:
     std::string sError;
 };
 
+int AddEmulatorDevice(DeviceTypeID type, const char* ip, int port);
 
 void ListHIDDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);
 void ListWebUSBDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);

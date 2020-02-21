@@ -36,10 +36,13 @@ const DeviceType webusbDeviceTypes[] = {
     DeviceType(0x1209, 0x53c1, "Trezor", "One", USBDEVICE_TREZOR_ONE),
 };
 
+/*
 const DeviceType emulatorDeviceTypes[] = {
     DeviceType(0x1209, 0x53c1, "Trezor", "One", USBDEVICE_TREZOR_ONE),
     DeviceType(0x2c97, 0x0001, "Ledger", "Nano S", USBDEVICE_LEDGER_NANO_S),
-};
+}; */
+
+std::vector<CEmulatorDevice *> emulators;
 
 void ShutdownHardwareIntegration()
 {
@@ -79,6 +82,15 @@ static bool MatchTrezorInterface(struct hid_device_info *cur_dev)
     return cur_dev->usage_page == 0xff00;
 #endif
     return cur_dev->interface_number == 0;
+}
+
+
+int AddEmulatorDevice(DeviceTypeID type, const char* ip, int port)
+{
+    CEmulatorDevice *emulator = new CEmulatorDevice(type, ip, port);
+    emulators.push_back(emulator);
+
+    return 0;
 }
 
 void ListHIDDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
@@ -162,30 +174,16 @@ void ListWebUSBDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
 
 void ListEmulatorDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
 {
-    sockaddr_in emulator_destination;
-    emulator_destination.sin_family = AF_INET;
-    emulator_destination.sin_port = htons(40000);
-    if (inet_aton("127.0.0.1", &emulator_destination.sin_addr)==0) {
-        return;
+    // vDevices.insert(vDevices.end(), emulators.begin(), emulators.end());
+    // std::copy(emulators.begin(), emulators.end(), std::back_inserter(vDevices));
+    for (int i = 0; i < emulators.size(); i++) {
+        usb_device::CEmulatorDevice *factory = emulators[i];
+        usb_device::CUSBDevice device;
+        if(factory->getNewUsbDevice(device) == 0) {
+            vDevices.push_back(std::unique_ptr<CUSBDevice>(&device));
+        }
     }
-    std::unique_ptr<CUSBDevice> device(new CLedgerDevice(emulator_destination));
-    vDevices.push_back(std::move(device));
-
     return;
-
-    /* TREZOR
-    // Initialize socket address to emulator
-    sockaddr_in emulator_destination;
-    emulator_destination.sin_family = AF_INET;
-    emulator_destination.sin_port = htons(21324);
-    if (inet_aton("127.0.0.1", &emulator_destination.sin_addr)==0) {
-        return;
-    }
-    // TODO: ping to make sure it's up (see trezor example pingpong)
-    std::unique_ptr<CUSBDevice> device(new CTrezorDevice(emulator_destination));
-    vDevices.push_back(std::move(device));
-        
-    return; */
 };
 
 void ListAllDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
@@ -197,7 +195,6 @@ void ListAllDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
 
     ListHIDDevices(vDevices);
     ListWebUSBDevices(vDevices);
-    // TODO: how to handle multiple devices (debugdevice + emulator device)?
     ListEmulatorDevices(vDevices);
 
     return;

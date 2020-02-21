@@ -151,6 +151,59 @@ static UniValue devicebackup(const JSONRPCRequest &request)
     return result;
 };
 
+static UniValue addemulatordevice(const JSONRPCRequest &request)
+{
+    if (request.fHelp || request.params.size() > 3)
+        throw std::runtime_error(
+            RPCHelpMan{"addemulatordevice",
+                "\nAdd a hardware emulator device.\n",
+                {
+                    {"type", RPCArg::Type::STR, /* default */ "", "Type of hardware emulator: 'ledger' or 'trezor'."},
+                    {"ip", RPCArg::Type::STR, /* default */ "", "IP address of the emulator."},
+                    {"port", RPCArg::Type::NUM, /* default */ "", "Port at which the emulator is listening."},
+                },
+                RPCResult{
+            "{\n"
+            "  \"added\"            (bool) whether the device was added to the list.\n"
+            "  \"ping\"             (bool) connection status to the emulator.\n"
+            "}\n"
+                },
+                RPCExamples{
+            HelpExampleCli("addemulatordevice", "\"ledger\" \"127.0.0.1\" 40000") +
+            "\nAs a JSON-RPC call\n"
+            + HelpExampleRpc("addemulatordevice", "\"ledger\" \"127.0.0.1\" 40000")
+                },
+            }.ToString());
+
+    std::string type, ip, port, sError;
+    if (!request.params[0].isNull()) {
+        type = request.params[0].get_str();
+    }
+    if (!request.params[1].isNull()) {
+        ip = request.params[1].get_str();
+    }
+    if (!request.params[2].isNull()) {
+        port = request.params[2].get_str();
+    }
+    if (!type.length() || !ip.length()  || !port.length() ) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, _("One of the parameters was not passed properly."));
+    }
+
+    usb_device::DeviceTypeID t;
+    if (type.compare("trezor") == 0) {
+        t = usb_device::EMULATOR_TREZOR;
+    } else if (type.compare("ledger") == 0) {
+        t = usb_device::EMULATOR_LEDGER;
+    } else {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, _("Unknown emulator type provided."));
+    }
+
+    AddEmulatorDevice(t, ip.c_str(), atoi(port.c_str()));
+    UniValue result(UniValue::VARR);
+
+    return result;
+};
+
 static UniValue listdevices(const JSONRPCRequest &request)
 {
     if (request.fHelp || request.params.size() > 0)
@@ -1192,7 +1245,9 @@ static const CRPCCommand commands[] =
   //  --------------------- ------------------------        -----------------------     ----------
     { "usbdevice",          "deviceloadmnemonic",           &deviceloadmnemonic,        {"wordcount", "pinprotection"} },
     { "usbdevice",          "devicebackup",                 &devicebackup,              {} },
+    { "usbdevice",          "unlockdevice",                 &unlockdevice,              {"passphrase", "pin"} },
     { "usbdevice",          "listdevices",                  &listdevices,               {} },
+    { "usbdevice",          "addemulatordevice",            &addemulatordevice,         {"type", "ip", "port"} },
     { "usbdevice",          "promptunlockdevice",           &promptunlockdevice,        {} },
     { "usbdevice",          "unlockdevice",                 &unlockdevice,              {"passphrase", "pin"} },
     { "usbdevice",          "getdeviceinfo",                &getdeviceinfo,             {} },
