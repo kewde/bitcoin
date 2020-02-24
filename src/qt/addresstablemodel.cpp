@@ -475,3 +475,29 @@ void AddressTableModel::emitDataChanged(int idx)
     Q_EMIT dataChanged(index(idx, 0, QModelIndex()), index(idx, columns.length()-1, QModelIndex()));
 }
 
+void AddressTableModel::verifyOnHardwareDevice(QString address)
+{
+    if (walletModel->isHardwareLinkedWallet()) {
+
+        // Get the HD path for the address
+        UniValue rv;
+        QString sCommandPath = "getaddressinfo \"" + address + "\"";
+        if (!walletModel->tryCallRpc(sCommandPath, rv)) {
+            return;
+        }
+
+        // No path (imported privkey?)
+        if (rv["path"].isNull()) {
+            return;
+        }
+
+        // Call getdevicepublickey() with display=true
+        std::string path = rv["path"].get_str();
+        path.erase(0, 2); // Erase m/
+        QString sCommandDisplay = "getdevicepublickey \"" + QString::fromStdString(path) + "\"";
+        if (!walletModel->tryCallRpc(sCommandDisplay, rv)) {
+            return;
+        }
+
+    }
+}

@@ -88,6 +88,7 @@ public:
     EditStatus getEditStatus() const { return editStatus; }
 
     OutputType GetDefaultAddressType() const;
+    void verifyOnHardwareDevice(QString address);
 
 private:
     WalletModel* const walletModel;
