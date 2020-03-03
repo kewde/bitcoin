@@ -37,8 +37,8 @@ int ReceiveFromEmulator(int emulator_handle, unsigned char *out, size_t outLengt
     LogPrintf("%s: response_length: %ld\n", __func__, response_length);
 
     // Make sure that we can fit the data in the out buffer without overflow
-    if (outLength < response_length + 1) {
-        LogPrintf("%s: can't fit the returned apdus into the buffer : %ld < %ld\n", __func__, outLength, response_length+1);
+    if (outLength < response_length) {
+        LogPrintf("%s: can't fit the returned apdus into the buffer : %ld < %ld\n", __func__, outLength, response_length);
         return 0;
     }
 
