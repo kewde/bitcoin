@@ -276,6 +276,7 @@ BITCOIN_CORE_H = \
   zmq/zmqpublishnotifier.h \
   zmq/zmqrpc.h \
   usbdevice/usbdevice.h \
+  usbdevice/devicemanager.h \
   usbdevice/rpcusbdevice.h \
   insight/addressindex.h \
   insight/spentindex.h \
@@ -395,6 +396,7 @@ libparticl_usbdevice_a_SOURCES = \
   usbdevice/trezor/messages-bitcoin.proto \
   usbdevice/trezordevice.h \
   usbdevice/trezordevice.cpp \
+  usbdevice/devicemanager.cpp \
   usbdevice/rpcusbdevice.cpp
 nodist_libparticl_usbdevice_a_SOURCES = \
   usbdevice/trezor/messages.pb.h \

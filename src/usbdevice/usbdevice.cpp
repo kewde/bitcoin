@@ -14,7 +14,6 @@
 
 #include <stdint.h>
 #include <univalue.h>
-#include <chainparams.h>
 
 #ifdef ENABLE_WALLET
 #include <wallet/hdwallet.h>
@@ -42,7 +41,7 @@ const DeviceType emulatorDeviceTypes[] = {
     DeviceType(0x2c97, 0x0001, "Ledger", "Nano S", USBDEVICE_LEDGER_NANO_S),
 }; */
 
-std::vector<CEmulatorDevice *> emulators;
+
 
 void ShutdownHardwareIntegration()
 {
@@ -82,15 +81,6 @@ static bool MatchTrezorInterface(struct hid_device_info *cur_dev)
     return cur_dev->usage_page == 0xff00;
 #endif
     return cur_dev->interface_number == 0;
-}
-
-
-int AddEmulatorDevice(DeviceTypeID type, const char* ip, int port)
-{
-    CEmulatorDevice *emulator = new CEmulatorDevice(type, ip, port);
-    emulators.push_back(emulator);
-
-    return 0;
 }
 
 void ListHIDDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
@@ -170,54 +160,6 @@ void ListWebUSBDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
     webusb_exit();
 
     return;
-};
-
-void ListEmulatorDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
-{
-    // vDevices.insert(vDevices.end(), emulators.begin(), emulators.end());
-    // std::copy(emulators.begin(), emulators.end(), std::back_inserter(vDevices));
-    for (int i = 0; i < emulators.size(); i++) {
-        usb_device::CEmulatorDevice *factory = emulators[i];
-        usb_device::CUSBDevice device;
-        if(factory->getNewUsbDevice(device) == 0) {
-            vDevices.push_back(std::unique_ptr<CUSBDevice>(&device));
-        }
-    }
-    return;
-};
-
-void ListAllDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices)
-{
-    if (Params().NetworkIDString() == "regtest") {
-        vDevices.push_back(std::unique_ptr<CUSBDevice>(new CDebugDevice()));
-        return;
-    }
-
-    ListHIDDevices(vDevices);
-    ListWebUSBDevices(vDevices);
-    ListEmulatorDevices(vDevices);
-
-    return;
-};
-
-CUSBDevice *SelectDevice(std::vector<std::unique_ptr<CUSBDevice> > &vDevices, std::string &sError)
-{
-    if (Params().NetworkIDString() == "regtest") {
-        vDevices.push_back(std::unique_ptr<CUSBDevice>(new CDebugDevice()));
-        return vDevices[0].get();
-    }
-
-    ListAllDevices(vDevices);
-    if (vDevices.size() < 1) {
-        sError = "No device found.";
-        return nullptr;
-    }
-    if (vDevices.size() > 1) { // TODO: Select device
-        sError = "Multiple devices found.";
-        return nullptr;
-    }
-
-    return vDevices[0].get();
 };
 
 DeviceSignatureCreator::DeviceSignatureCreator(CUSBDevice *pDeviceIn, const CMutableTransaction *txToIn,

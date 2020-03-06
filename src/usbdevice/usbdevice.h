@@ -149,13 +149,8 @@ public:
     std::string sError;
 };
 
-int AddEmulatorDevice(DeviceTypeID type, const char* ip, int port);
-
 void ListHIDDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);
 void ListWebUSBDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);
-void ListEmulatorDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);
-void ListAllDevices(std::vector<std::unique_ptr<CUSBDevice> > &vDevices);
-CUSBDevice *SelectDevice(std::vector<std::unique_ptr<CUSBDevice> > &vDevices, std::string &sError);
 
 /** A signature creator for transactions. */
 class DeviceSignatureCreator : public BaseSignatureCreator {

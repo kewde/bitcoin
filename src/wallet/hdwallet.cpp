@@ -35,7 +35,7 @@
 #include <wallet/fees.h>
 
 #if ENABLE_USBDEVICE
-#include <usbdevice/usbdevice.h>
+#include <usbdevice/devicemanager.h>
 #endif
 
 #include <univalue.h>
